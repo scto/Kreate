@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import me.knighthat.component.dialog.RestartAppDialog
 import me.knighthat.component.export.ExportDatabaseDialog
+import me.knighthat.component.export.ExportForMigrationDialog
 import me.knighthat.component.export.ExportSettingsDialog
 import me.knighthat.component.import.ImportDatabase
 import me.knighthat.component.import.ImportSettings
@@ -471,6 +472,15 @@ fun DataSettings() {
             R.string.existing_data_will_be_overwritten,
             context.applicationInfo.nonLocalizedLabel
         ))
+
+        val exportForMigrationDialog = ExportForMigrationDialog( context, binder )
+        exportForMigrationDialog.Render()
+
+        SettingsEntry(
+            title = "Create backup for migration",
+            text = "Create a file that stores your settings, database, and cached songs to migrate to new app",
+            onClick = exportForMigrationDialog::showDialog
+        )
 
         SettingsGroupSpacer()
         SettingsEntryGroupText(title = stringResource(R.string.search_history))
