@@ -68,38 +68,39 @@ class ExportForMigrationDialog(
 
                     CoroutineScope( Dispatchers.IO ).launch {
 
-                        fun getFullyCached( cache: Cache ) =
-                            cache.keys
-                                 .filter { key ->
-                                     val contentLength = Database.formatContentLength( key )
+                        fun actionOnFullyCached( cache: Cache, actionOnEachSpan: (String, ByteArray) -> Unit ) =
+                            cache.keys.forEach { key ->
+                                val contentLength = Database.formatContentLength( key )
+                                // Only take fully cached songs to save space
+                                if( !cache.isCached( key, 0, contentLength ) )
+                                    return@forEach
 
-                                     // Only take fully cached songs to save space
-                                     cache.isCached( key, 0, contentLength )
-                                 }
-                                 .flatMap { key ->
-                                     cache.getCachedSpans( key )
-                                          .mapNotNull cacheSpan@ { span ->
-                                              val file = span.file ?: return@cacheSpan null
+                                cache.getCachedSpans( key ).forEach cacheSpan@ { span ->
+                                    val file = span.file ?: return@cacheSpan
 
-                                              val filePrefix =
-                                                  file.parentFile?.let {
-                                                      if( it.name.isDigitsOnly() )
-                                                          "${it.nameWithoutExtension}/"
-                                                      else
-                                                          null
-                                                  } ?: ""
+                                    val filePrefix =
+                                        file.parentFile?.let {
+                                            if( it.name.isDigitsOnly() )
+                                                "${it.nameWithoutExtension}/"
+                                            else
+                                                null
+                                        } ?: ""
 
-                                              "${filePrefix}${file.name}" to file.readBytes()
-                                          }
-                                 }
-                                .toMap()
-
+                                    actionOnEachSpan( "${filePrefix}${file.name}", file.readBytes() )
+                                }
+                            }
 
                         context.contentResolver
                                .openOutputStream( uri )
                                ?.use { outStream ->     // Use [use] because it closes stream on exit
                                    ZipOutputStream( outStream ).use { zipOut ->
                                        //<editor-fold desc="Save cached songs">
+                                       actionOnFullyCached( binder.cache ) { fileName, data ->
+                                           zipOut.putNextEntry( ZipEntry("cached/$fileName") )
+                                           zipOut.write( data )
+                                           zipOut.closeEntry()
+                                       }
+
                                        val cacheLocType = context.preferences.getEnum(
                                            exoPlayerCacheLocationKey, ExoPlayerCacheLocation.System
                                        )
@@ -108,12 +109,6 @@ class ExportForMigrationDialog(
                                                context.filesDir
                                            else
                                                context.cacheDir
-
-                                       getFullyCached( binder.cache ).forEach { (id, data) ->
-                                           zipOut.putNextEntry( ZipEntry("cached/$id") )
-                                           zipOut.write( data )
-                                           zipOut.closeEntry()
-                                       }
                                        val cacheDir = cacheLocation.resolve("rimusic_cache")
                                        if( cacheDir.exists() )
                                            cacheDir.listFiles()?.forEach {
@@ -126,11 +121,12 @@ class ExportForMigrationDialog(
                                        //</editor-fold>
 
                                        //<editor-fold desc="Save downloaded songs">
-                                       getFullyCached( binder.downloadCache ).forEach { (id, data) ->
-                                           zipOut.putNextEntry( ZipEntry("downloaded/$id") )
+                                       actionOnFullyCached( binder.downloadCache ) { fileName, data ->
+                                           zipOut.putNextEntry( ZipEntry("downloaded/$fileName") )
                                            zipOut.write( data )
                                            zipOut.closeEntry()
                                        }
+
                                        val downloadDir = MyDownloadHelper.getDownloadDirectory( context )
                                                                                .resolve( "downloads" )
                                        if( downloadDir.exists() )
