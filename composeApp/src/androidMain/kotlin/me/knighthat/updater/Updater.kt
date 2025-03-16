@@ -102,10 +102,13 @@ object Updater {
              * 2 [Instant]s are compared by their date, not exact time.
              */
             val zone = ZoneId.systemDefault()
-            val projBuildTime = Instant.parse( BuildConfig.BUILD_TIME ).atZone( zone ).toLocalDate()
-            val upstreamBuildTime = build.buildTime.atZone( zone ).toLocalDate()
+            val projBuildTime = Instant.parse( BuildConfig.BUILD_TIME ).atZone( zone )
+            val upstreamBuildTime = build.buildTime.atZone( zone )
 
-            NewUpdateAvailableDialog.isActive = upstreamBuildTime.isAfter( projBuildTime )
+            // This version has moved into manual upload mode.
+            // Some delay causes update dialog to show up constantly
+            // this is just a work around. No permanent solution planned.
+            NewUpdateAvailableDialog.isActive = projBuildTime.plusHours( 1L ).isBefore( upstreamBuildTime )
         } catch( e: Exception ) {
             var message = appContext().resources.getString( R.string.error_unknown )
 
