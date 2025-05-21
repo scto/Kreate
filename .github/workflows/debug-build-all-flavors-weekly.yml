@@ -212,7 +212,7 @@ jobs:
         run: ./gradlew assembleIzzy
         
       - name: Upload debug artifacts
-        ses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: unsigned-izzy
           path: |
